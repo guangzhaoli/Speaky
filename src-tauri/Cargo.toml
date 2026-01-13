@@ -1,0 +1,68 @@
+[package]
+name = "audio-input"
+version = "0.1.0"
+description = "跨平台语音输入工具"
+authors = ["lucas"]
+edition = "2021"
+
+[lib]
+name = "audio_input_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 核心
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-clipboard-manager = "2"
+
+# 音频采集
+cpal = "0.15"
+
+# 键盘模拟
+enigo = "0.3"
+
+# WebSocket
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 并发
+parking_lot = "0.12"
+
+# 日志
+log = "0.4"
+env_logger = "0.11"
+
+# 配置持久化
+directories = "5"
+toml = "0.8"
+
+# 错误处理
+thiserror = "1"
+anyhow = "1"
+
+# UUID 生成
+uuid = { version = "1", features = ["v4"] }
+
+# 静态变量
+lazy_static = "1.4"
+
+# HMAC 签名认证
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+
+# Gzip 解压
+flate2 = "1.0"
+
+# 零拷贝类型转换
+bytemuck = { version = "1.14", features = ["derive"] }
