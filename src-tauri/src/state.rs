@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::asr::providers::{DoubaoConfig, WhisperApiConfig, WhisperLocalConfig};
 use crate::postprocess::PostProcessConfig;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -14,11 +15,49 @@ pub enum RecordingState {
     Processing,
 }
 
+/// ASR 配置
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AsrConfig {
+    /// 当前激活的 Provider ID ("doubao", "whisper_local", "whisper_api")
+    #[serde(default = "default_active_provider")]
+    pub active_provider: String,
+    /// 豆包配置
+    #[serde(default)]
+    pub doubao: Option<DoubaoConfig>,
+    /// Whisper 本地配置
+    #[serde(default)]
+    pub whisper_local: Option<WhisperLocalConfig>,
+    /// Whisper API 配置
+    #[serde(default)]
+    pub whisper_api: Option<WhisperApiConfig>,
+}
+
+fn default_active_provider() -> String {
+    "doubao".to_string()
+}
+
+impl Default for AsrConfig {
+    fn default() -> Self {
+        Self {
+            active_provider: default_active_provider(),
+            doubao: Some(DoubaoConfig::default()),
+            whisper_local: None,
+            whisper_api: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub app_id: String,
-    pub access_token: String,
+    /// ASR 配置（新）
     #[serde(default)]
+    pub asr: AsrConfig,
+    /// 旧字段，用于向后兼容迁移
+    #[serde(default, skip_serializing)]
+    pub app_id: String,
+    #[serde(default, skip_serializing)]
+    pub access_token: String,
+    #[serde(default, skip_serializing)]
     pub secret_key: String,
     pub shortcut: String,
     pub auto_type: bool,
@@ -39,6 +78,13 @@ pub struct AppConfig {
     /// 是否启用日志记录到文件
     #[serde(default = "default_enable_logging")]
     pub enable_logging: bool,
+    /// ASR 识别语言 ("auto", "zh", "en", "ja", "ko", etc.)
+    #[serde(default = "default_asr_language")]
+    pub asr_language: String,
+}
+
+fn default_asr_language() -> String {
+    "zh".to_string()
 }
 
 fn default_show_indicator() -> bool {
@@ -52,6 +98,7 @@ fn default_enable_logging() -> bool {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            asr: AsrConfig::default(),
             app_id: String::new(),
             access_token: String::new(),
             secret_key: String::new(),
@@ -65,6 +112,7 @@ impl Default for AppConfig {
             postprocess: PostProcessConfig::default(),
             audio_device: String::new(),
             enable_logging: true,
+            asr_language: default_asr_language(),
         }
     }
 }
@@ -81,9 +129,11 @@ impl AppConfig {
         if let Some(path) = Self::config_path() {
             if path.exists() {
                 match fs::read_to_string(&path) {
-                    Ok(content) => match toml::from_str(&content) {
-                        Ok(config) => {
+                    Ok(content) => match toml::from_str::<AppConfig>(&content) {
+                        Ok(mut config) => {
                             log::info!("Config loaded from {:?}", path);
+                            // 迁移旧配置到新的 ASR 配置
+                            config.migrate_legacy_asr_config();
                             return config;
                         }
                         Err(e) => {
@@ -97,6 +147,24 @@ impl AppConfig {
             }
         }
         Self::default()
+    }
+
+    /// 迁移旧的 ASR 配置到新结构
+    fn migrate_legacy_asr_config(&mut self) {
+        // 如果旧字段有值，迁移到新的 asr.doubao 配置
+        if !self.app_id.is_empty() || !self.access_token.is_empty() {
+            let doubao_config = DoubaoConfig {
+                app_id: std::mem::take(&mut self.app_id),
+                access_token: std::mem::take(&mut self.access_token),
+                secret_key: std::mem::take(&mut self.secret_key),
+            };
+
+            // 只有当 doubao 配置为空或未配置时才迁移
+            if self.asr.doubao.as_ref().map(|c| !c.is_configured()).unwrap_or(true) {
+                self.asr.doubao = Some(doubao_config);
+                log::info!("Migrated legacy ASR config to new format");
+            }
+        }
     }
 
     /// 保存配置到文件

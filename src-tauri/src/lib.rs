@@ -136,6 +136,15 @@ pub fn run() {
             commands::get_logs,
             commands::clear_logs,
             commands::set_logging_enabled,
+            // ASR Provider 相关命令
+            commands::get_asr_config,
+            commands::update_asr_config,
+            commands::list_asr_providers,
+            commands::get_whisper_models,
+            commands::download_whisper_model,
+            commands::delete_whisper_model,
+            commands::cancel_whisper_download,
+            commands::set_whisper_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

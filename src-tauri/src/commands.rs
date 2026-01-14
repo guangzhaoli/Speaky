@@ -1,9 +1,12 @@
-use crate::asr::client::{AsrClient, AsrResult};
+use crate::asr::client::AsrClient;
+use crate::asr::provider::{AsrResult, DownloadProgress, ModelInfo, ProviderInfo};
+use crate::asr::providers::{DoubaoProvider, WhisperApiProvider, WhisperLocalProvider, WhisperModelSize};
+use crate::asr::{AsrProvider, ModelDownloadable};
 use crate::audio::capture::{list_audio_devices, AudioCaptureController, AudioDevice};
 use crate::history::{History, HistoryEntry};
 use crate::input::keyboard::KeyboardSimulator;
 use crate::postprocess::{self, LlmProvider};
-use crate::state::{AppConfig, AppState, RecordingState};
+use crate::state::{AppConfig, AppState, AsrConfig, RecordingState};
 use auto_launch::AutoLaunchBuilder;
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -281,6 +284,142 @@ pub fn set_logging_enabled(enabled: bool, app: AppHandle) -> Result<(), String> 
     Ok(())
 }
 
+// ============ ASR Provider 相关命令 ============
+
+/// 获取 ASR 配置
+#[command]
+pub fn get_asr_config(app: AppHandle) -> AsrConfig {
+    let state = app.state::<AppState>();
+    state.get_config().asr
+}
+
+/// 更新 ASR 配置
+#[command]
+pub fn update_asr_config(app: AppHandle, asr_config: AsrConfig) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut config = state.get_config();
+    config.asr = asr_config;
+    state.update_config(config)
+}
+
+/// 列出所有可用的 ASR Provider
+#[command]
+pub fn list_asr_providers(app: AppHandle) -> Vec<ProviderInfo> {
+    let state = app.state::<AppState>();
+    let config = state.get_config();
+    let mut providers = Vec::new();
+
+    // 豆包
+    if let Some(ref doubao_config) = config.asr.doubao {
+        let provider = DoubaoProvider::new(doubao_config.clone());
+        providers.push(provider.info());
+    } else {
+        // 即使没配置也显示
+        let provider = DoubaoProvider::new(Default::default());
+        providers.push(provider.info());
+    }
+
+    // Whisper 本地
+    let whisper_local = WhisperLocalProvider::new(
+        config.asr.whisper_local.clone().unwrap_or_default(),
+    );
+    providers.push(whisper_local.info());
+
+    // Whisper API
+    if let Some(ref api_config) = config.asr.whisper_api {
+        let provider = WhisperApiProvider::new(api_config.clone());
+        providers.push(provider.info());
+    } else {
+        let provider = WhisperApiProvider::new(Default::default());
+        providers.push(provider.info());
+    }
+
+    providers
+}
+
+/// 获取 Whisper 模型列表
+#[command]
+pub fn get_whisper_models(app: AppHandle) -> Vec<ModelInfo> {
+    let state = app.state::<AppState>();
+    let config = state.get_config();
+    let provider = WhisperLocalProvider::new(
+        config.asr.whisper_local.clone().unwrap_or_default(),
+    );
+    provider.available_models()
+}
+
+/// 下载 Whisper 模型
+#[command]
+pub async fn download_whisper_model(app: AppHandle, model_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state.get_config();
+    let provider = WhisperLocalProvider::new(
+        config.asr.whisper_local.clone().unwrap_or_default(),
+    );
+
+    let (progress_tx, mut progress_rx) = mpsc::channel::<DownloadProgress>(32);
+
+    // 转发进度到前端
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        while let Some(progress) = progress_rx.recv().await {
+            let _ = app_clone.emit("model-download-progress", &progress);
+        }
+    });
+
+    // 执行下载
+    provider
+        .download_model(&model_id, progress_tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 发送完成事件
+    let _ = app.emit("model-download-complete", &model_id);
+    Ok(())
+}
+
+/// 删除 Whisper 模型
+#[command]
+pub async fn delete_whisper_model(app: AppHandle, model_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state.get_config();
+    let provider = WhisperLocalProvider::new(
+        config.asr.whisper_local.clone().unwrap_or_default(),
+    );
+
+    provider
+        .delete_model(&model_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 取消 Whisper 模型下载
+#[command]
+pub fn cancel_whisper_download(app: AppHandle) {
+    let state = app.state::<AppState>();
+    let config = state.get_config();
+    let provider = WhisperLocalProvider::new(
+        config.asr.whisper_local.clone().unwrap_or_default(),
+    );
+    provider.cancel_download();
+}
+
+/// 设置当前使用的 Whisper 模型
+#[command]
+pub fn set_whisper_model(app: AppHandle, model_id: String) -> Result<(), String> {
+    let model_size = WhisperModelSize::from_filename(&model_id)
+        .ok_or_else(|| format!("未知模型: {}", model_id))?;
+
+    let state = app.state::<AppState>();
+    let mut config = state.get_config();
+
+    let mut whisper_config = config.asr.whisper_local.unwrap_or_default();
+    whisper_config.model_size = model_size;
+    config.asr.whisper_local = Some(whisper_config);
+
+    state.update_config(config)
+}
+
 /// 解析快捷键字符串为 Shortcut
 pub fn parse_shortcut(shortcut_str: &str) -> Result<Shortcut, String> {
     let parts: Vec<&str> = shortcut_str.split('+').map(|s| s.trim()).collect();
@@ -492,7 +631,29 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
         show_indicator(app);
     }
 
-    if config.app_id.is_empty() || config.access_token.is_empty() {
+    // 根据 active_provider 选择 ASR Provider 并验证配置
+    let provider_error: Option<&str> = match config.asr.active_provider.as_str() {
+        "doubao" => {
+            match &config.asr.doubao {
+                Some(cfg) if cfg.is_configured() => None,
+                _ => Some("请先配置豆包 App ID 和 Access Token"),
+            }
+        }
+        "whisper_local" => {
+            let whisper_config = config.asr.whisper_local.clone().unwrap_or_default();
+            let provider = WhisperLocalProvider::new(whisper_config);
+            if provider.is_ready() { None } else { Some("请先下载 Whisper 模型") }
+        }
+        "whisper_api" => {
+            match &config.asr.whisper_api {
+                Some(cfg) if cfg.is_configured() => None,
+                _ => Some("请先配置 Whisper API Key"),
+            }
+        }
+        _ => Some("未知的 ASR Provider"),
+    };
+
+    if let Some(error_msg) = provider_error {
         // 发送未配置事件
         let _ = app.emit("indicator-not-configured", ());
         // 延迟隐藏指示器
@@ -501,7 +662,7 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             hide_indicator(&app_clone);
         });
-        return Err("Please configure App ID and Access Token first".to_string());
+        return Err(error_msg.to_string());
     }
 
     state.set_recording_state(RecordingState::Recording);
@@ -548,13 +709,70 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
         drop(capture);
     });
 
-    // ASR 客户端
-    let asr_client = AsrClient::new(config.app_id, config.access_token, config.secret_key);
-    tokio::spawn(async move {
-        if let Err(e) = asr_client.connect_and_stream(audio_rx, result_tx).await {
-            log::error!("ASR session error: {}", e);
+    // 根据 active_provider 启动对应的 ASR
+    match config.asr.active_provider.as_str() {
+        "doubao" => {
+            // 使用原有的豆包 ASR 客户端（性能更好的流式实现）
+            let doubao_config = config.asr.doubao.clone().unwrap_or_default();
+            let asr_client = AsrClient::new(
+                doubao_config.app_id,
+                doubao_config.access_token,
+                doubao_config.secret_key,
+            );
+
+            // 创建内部结果通道，转换格式
+            let (internal_tx, mut internal_rx) = mpsc::channel::<crate::asr::client::AsrResult>(32);
+
+            // 启动格式转换任务
+            let result_tx_clone = result_tx.clone();
+            tokio::spawn(async move {
+                while let Some(internal_result) = internal_rx.recv().await {
+                    let result = AsrResult {
+                        text: internal_result.text,
+                        is_final: !internal_result.is_prefetch,
+                    };
+                    if result_tx_clone.send(result).await.is_err() {
+                        break;
+                    }
+                }
+            });
+
+            tokio::spawn(async move {
+                if let Err(e) = asr_client.connect_and_stream(audio_rx, internal_tx).await {
+                    log::error!("ASR session error: {}", e);
+                }
+            });
         }
-    });
+        "whisper_local" => {
+            let mut whisper_config = config.asr.whisper_local.clone().unwrap_or_default();
+            // 使用统一的语言设置
+            whisper_config.language = config.asr_language.clone();
+            let provider = WhisperLocalProvider::new(whisper_config);
+            tokio::spawn(async move {
+                if let Err(e) = provider.transcribe_stream(audio_rx, result_tx).await {
+                    log::error!("Whisper local ASR error: {}", e);
+                }
+            });
+        }
+        "whisper_api" => {
+            let mut api_config = config.asr.whisper_api.clone().unwrap_or_default();
+            // 使用统一的语言设置
+            if config.asr_language != "auto" {
+                api_config.language = Some(config.asr_language.clone());
+            } else {
+                api_config.language = None;
+            }
+            let provider = WhisperApiProvider::new(api_config);
+            tokio::spawn(async move {
+                if let Err(e) = provider.transcribe_stream(audio_rx, result_tx).await {
+                    log::error!("Whisper API ASR error: {}", e);
+                }
+            });
+        }
+        _ => {
+            return Err("未知的 ASR Provider".to_string());
+        }
+    }
 
     // 处理识别结果 - 带节流和 prefetch 检测
     let app_clone = app.clone();
@@ -571,20 +789,13 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
 
     tokio::spawn(async move {
         let mut final_text = String::new();
-        let mut prefetch_text: Option<String> = None;
         let mut last_emit = Instant::now();
         const THROTTLE_MS: u128 = 100;
 
         while let Some(result) = result_rx.recv().await {
             // 直接移动 result.text，避免多次 clone
             let text = result.text;
-            let is_prefetch = result.is_prefetch;
-
-            // 如果收到 prefetch，保存它
-            if is_prefetch {
-                log::info!("Prefetch result received: {}", text);
-                prefetch_text = Some(text.clone());
-            }
+            let is_final = result.is_final;
 
             // 更新 state
             let state = app_clone.state::<AppState>();
@@ -602,30 +813,34 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
                 last_emit = Instant::now();
             }
 
-            // 保存最终文本
-            final_text = text;
+            // 如果是最终结果，保存它
+            if is_final {
+                final_text = text;
+            } else {
+                // 中间结果也更新
+                final_text = text;
+            }
         }
 
-        // 使用 prefetch 结果（如果有）或最终结果
-        let final_result = prefetch_text.unwrap_or(final_text);
-        if !final_result.is_empty() {
+        // 使用最终结果
+        if !final_text.is_empty() {
             let state = app_clone.state::<AppState>();
             let config = state.get_config();
 
             // 后处理（仅非实时输入模式）
             let processed_result = if config.postprocess.enabled && !realtime_input {
-                match postprocess::process_text(&final_result, &config.postprocess).await {
+                match postprocess::process_text(&final_text, &config.postprocess).await {
                     Ok(text) => text,
                     Err(e) => {
                         log::error!("Postprocess failed: {}", e);
-                        final_result.clone()
+                        final_text.clone()
                     }
                 }
             } else {
-                final_result.clone()
+                final_text.clone()
             };
 
-            log::info!("ASR completed: {} -> {}", final_result, processed_result);
+            log::info!("ASR completed: {} -> {}", final_text, processed_result);
             state.set_transcript(processed_result.clone());
 
             // 保存到历史记录
@@ -642,7 +857,7 @@ pub async fn handle_start_recording(app: &AppHandle) -> Result<(), String> {
 
             // 实时输入模式下，完成时再次更新确保最终文本正确
             if realtime_input {
-                send_keyboard_command(KeyboardCommand::UpdateText(final_result));
+                send_keyboard_command(KeyboardCommand::UpdateText(final_text.clone()));
                 send_keyboard_command(KeyboardCommand::Finish);
             }
         }

@@ -3,246 +3,25 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize, availableMonitors } from "@tauri-apps/api/window";
 
-// 默认快捷键
-const DEFAULT_SHORTCUT = "Alt+Space";
-
-// 计算窗口尺寸（基于屏幕分辨率百分比）
-const calculateWindowSizes = (screenWidth: number, screenHeight: number) => {
-  return {
-    main: {
-      width: Math.max(260, Math.round(screenWidth * 0.12)),
-      height: Math.max(280, Math.round(screenHeight * 0.18)),
-    },
-    settings: {
-      width: Math.max(520, Math.round(screenWidth * 0.30)),
-      height: Math.max(380, Math.round(screenHeight * 0.32)),
-    },
-  };
-};
-
-// Icons
-const MicIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-  </svg>
-);
-
-const SunIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-  </svg>
-);
-
-const MoonIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-);
-
-const SettingsIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
-
-const ChevronLeftIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
-const ChevronUpIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="18 15 12 9 6 15" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-  </svg>
-);
-
-// Settings Icons
-const GeneralIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
-
-const PostProcessIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
-  </svg>
-);
-
-const HistoryIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 8v4l3 3" />
-    <circle cx="12" cy="12" r="10" />
-  </svg>
-);
-
-const ConfigFileIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </svg>
-);
-
-const CopyIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-);
-
-const LogsIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    <line x1="8" y1="7" x2="16" y2="7" />
-    <line x1="8" y1="11" x2="16" y2="11" />
-    <line x1="8" y1="15" x2="12" y2="15" />
-  </svg>
-);
-
-type RecordingState = "idle" | "recording" | "processing";
-type SettingsTab = "general" | "postprocess" | "history" | "config" | "logs";
-type ViewMode = "main" | "settings";
-
-interface WindowSizes {
-  main: { width: number; height: number };
-  settings: { width: number; height: number };
-}
-
-interface Config {
-  app_id: string;
-  access_token: string;
-  secret_key: string;
-  shortcut: string;
-  auto_type: boolean;
-  auto_copy: boolean;
-  auto_start: boolean;
-  silent_start: boolean;
-  show_indicator: boolean;
-  realtime_input: boolean;
-  postprocess: PostProcessConfig;
-  audio_device: string;
-}
-
-interface AudioDevice {
-  name: string;
-  is_default: boolean;
-}
-
-interface HistoryEntry {
-  id: string;
-  text: string;
-  timestamp: string;
-}
-
-interface LogInfo {
-  path: string;
-  size: number;
-  enabled: boolean;
-}
-
-interface LlmProvider {
-  id: string;
-  name: string;
-  api_base: string;
-  api_key: string;
-  model: string;
-}
-
-type PostProcessMode = "General" | "Code" | "Meeting";
-
-interface PostProcessConfig {
-  enabled: boolean;
-  providers: LlmProvider[];
-  active_provider_id: string;
-  mode: PostProcessMode;
-}
-
-interface Toast {
-  id: number;
-  message: string;
-  type: "error" | "success" | "info";
-}
-
-// 预设 Provider 模板
-interface ProviderPreset {
-  name: string;
-  api_base: string;
-  models: string[];
-  default_model: string;
-}
-
-const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
-  deepseek: {
-    name: "DeepSeek",
-    api_base: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    default_model: "deepseek-chat",
-  },
-  openai: {
-    name: "OpenAI",
-    api_base: "https://api.openai.com/v1",
-    models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
-    default_model: "gpt-4o-mini",
-  },
-  kimi: {
-    name: "Kimi (Moonshot)",
-    api_base: "https://api.moonshot.cn/v1",
-    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-    default_model: "moonshot-v1-8k",
-  },
-  gemini: {
-    name: "Gemini (Google)",
-    api_base: "https://generativelanguage.googleapis.com/v1beta/openai",
-    models: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-    default_model: "gemini-2.0-flash",
-  },
-  zhipu: {
-    name: "智谱 (GLM)",
-    api_base: "https://open.bigmodel.cn/api/paas/v4",
-    models: ["glm-4-flash", "glm-4-plus", "glm-4"],
-    default_model: "glm-4-flash",
-  },
-  ollama: {
-    name: "Ollama (Local)",
-    api_base: "http://localhost:11434/v1",
-    models: ["llama3", "qwen2", "mistral"],
-    default_model: "llama3",
-  },
-};
+// 组件导入
+import {
+  MicIcon, SunIcon, MoonIcon, SettingsIcon,
+  ChevronLeftIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon,
+  GeneralIcon, PostProcessIcon, HistoryIcon, ConfigFileIcon,
+  TrashIcon, CopyIcon, LogsIcon, AsrIcon
+} from "./components/Icons";
+import {
+  type RecordingState, type SettingsTab, type ViewMode,
+  type WindowSizes, type Config, type WhisperModel, type DownloadProgress,
+  type LlmProvider, type HistoryEntry, type AudioDevice, type LogInfo, type Toast,
+  type PostProcessMode,
+  PROVIDER_PRESETS, DEFAULT_SHORTCUT, calculateWindowSizes
+} from "./components/types";
 
 // 设置类别配置
 const settingsTabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "general", label: "General", icon: <GeneralIcon /> },
+  { id: "asr", label: "ASR", icon: <AsrIcon /> },
   { id: "postprocess", label: "LLM Polish", icon: <PostProcessIcon /> },
   { id: "history", label: "History", icon: <HistoryIcon /> },
   { id: "logs", label: "Logs", icon: <LogsIcon /> },
@@ -285,9 +64,20 @@ export default function App() {
       mode: "General",
     },
     audio_device: "",
+    asr: {
+      active_provider: "doubao",
+      doubao: { app_id: "", access_token: "", secret_key: "" },
+    },
+    asr_language: "zh",
   });
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Whisper 模型列表和下载进度
+  const [whisperModels, setWhisperModels] = useState<WhisperModel[]>([]);
+  const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [deletingModel, setDeletingModel] = useState<string | null>(null);
 
   // 音频设备列表
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
@@ -341,12 +131,12 @@ export default function App() {
   }, []);
 
   const statusText = isRecording
-    ? "正在聆听..."
+    ? "Listening..."
     : isProcessing
-      ? "识别中..."
+      ? "Processing..."
       : isMacOS
-        ? "按住 ⌥ Space 开始"
-        : "按住 Alt+Space 开始";
+        ? "Hold ⌥ Space to start"
+        : "Hold Alt+Space to start";
 
   // 简洁Q弹缓动函数 (Ease Out Back - 轻微过冲)
   const springEase = (t: number): number => {
@@ -484,6 +274,7 @@ export default function App() {
     let unlistenStopped: UnlistenFn | null = null;
     let unlistenUpdate: UnlistenFn | null = null;
     let unlistenError: UnlistenFn | null = null;
+    let unlistenDownloadProgress: UnlistenFn | null = null;
 
     const setup = async () => {
       try {
@@ -491,7 +282,7 @@ export default function App() {
         setConfig(savedConfig as Config);
       } catch (e) {
         console.error("Failed to load config:", e);
-        showToast("加载配置失败");
+        showToast("Failed to load config");
       }
 
       // 加载音频设备列表
@@ -519,6 +310,19 @@ export default function App() {
       unlistenError = await listen("error", (event) => {
         showToast(event.payload as string);
       });
+
+      // 监听模型下载进度
+      unlistenDownloadProgress = await listen("model-download-progress", (event) => {
+        const progress = event.payload as DownloadProgress;
+        setDownloadProgress(progress.percent);
+        if (progress.percent >= 100) {
+          setDownloadingModel(null);
+          // 重新加载模型列表
+          invoke<WhisperModel[]>("get_whisper_models")
+            .then(setWhisperModels)
+            .catch(console.error);
+        }
+      });
     };
 
     setup();
@@ -528,6 +332,7 @@ export default function App() {
       unlistenStopped?.();
       unlistenUpdate?.();
       unlistenError?.();
+      unlistenDownloadProgress?.();
     };
   }, [showToast]);
 
@@ -579,7 +384,7 @@ export default function App() {
     try {
       await invoke("delete_history_entry", { id });
       setHistoryEntries((prev) => prev.filter((e) => e.id !== id));
-      showToast("已删除", "success");
+      showToast("Deleted", "success");
     } catch (e) {
       showToast(String(e));
     }
@@ -589,7 +394,7 @@ export default function App() {
     try {
       await invoke("clear_history");
       setHistoryEntries([]);
-      showToast("历史记录已清空", "success");
+      showToast("History cleared", "success");
     } catch (e) {
       showToast(String(e));
     }
@@ -602,7 +407,7 @@ export default function App() {
       // 重新加载配置到 UI
       const savedConfig = await invoke("get_config");
       setConfig(savedConfig as Config);
-      showToast("配置已保存", "success");
+      showToast("Config saved", "success");
     } catch (e) {
       showToast(String(e));
     }
@@ -611,9 +416,9 @@ export default function App() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      showToast("已复制", "success");
+      showToast("Copied", "success");
     } catch (e) {
-      showToast("复制失败");
+      showToast("Copy failed");
     }
   };
 
@@ -642,7 +447,7 @@ export default function App() {
       setLogEntries([]);
       const info = await invoke("get_log_info");
       setLogInfo(info as LogInfo);
-      showToast("日志已清空", "success");
+      showToast("Logs cleared", "success");
     } catch (e) {
       showToast(String(e));
     }
@@ -652,7 +457,7 @@ export default function App() {
     try {
       await invoke("set_logging_enabled", { enabled });
       setLogInfo((prev) => ({ ...prev, enabled }));
-      showToast(enabled ? "日志已启用" : "日志已禁用", "success");
+      showToast(enabled ? "Logging enabled" : "Logging disabled", "success");
     } catch (e) {
       showToast(String(e));
     }
@@ -692,7 +497,7 @@ export default function App() {
   const saveConfig = async () => {
     try {
       await invoke("update_config", { config });
-      showToast("设置已保存", "success");
+      showToast("Settings saved", "success");
     } catch (e) {
       console.error("Failed to save config:", e);
       showToast(String(e));
@@ -819,6 +624,37 @@ export default function App() {
         </div>
       </div>
 
+      {/* 语言设置 */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+          Recognition Language
+        </h3>
+        <div className="bg-bg-secondary rounded-xl border border-border-light overflow-hidden">
+          <div className="p-4">
+            <label className="block text-sm text-text-primary mb-2">Speech Language</label>
+            <select
+              value={config.asr_language}
+              onChange={(e) => updateConfig("asr_language", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm border border-border rounded-lg focus:outline-none focus:border-accent transition-colors bg-bg-input text-text-primary"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="auto" className="bg-bg-secondary text-text-primary">Auto Detect</option>
+              <option value="zh" className="bg-bg-secondary text-text-primary">Chinese (中文)</option>
+              <option value="en" className="bg-bg-secondary text-text-primary">English</option>
+              <option value="ja" className="bg-bg-secondary text-text-primary">Japanese (日本語)</option>
+              <option value="ko" className="bg-bg-secondary text-text-primary">Korean (한국어)</option>
+              <option value="es" className="bg-bg-secondary text-text-primary">Spanish (Español)</option>
+              <option value="fr" className="bg-bg-secondary text-text-primary">French (Français)</option>
+              <option value="de" className="bg-bg-secondary text-text-primary">German (Deutsch)</option>
+              <option value="ru" className="bg-bg-secondary text-text-primary">Russian (Русский)</option>
+            </select>
+            <p className="text-xs text-text-muted mt-2">
+              Select the language you will be speaking. This applies to all ASR engines.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 启动设置 */}
       <div className="space-y-3">
         <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
@@ -860,45 +696,6 @@ export default function App() {
               <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
             </div>
           </label>
-        </div>
-      </div>
-
-      {/* API 配置区块 */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
-          API Configuration
-        </h3>
-        <div className="bg-bg-secondary rounded-xl border border-border-light overflow-hidden">
-          <div className="p-4 border-b border-border-light">
-            <label className="block text-sm text-text-primary mb-2">App ID</label>
-            <input
-              type="text"
-              value={config.app_id}
-              onChange={(e) => updateConfig("app_id", e.target.value)}
-              placeholder="Enter Doubao App ID"
-              className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
-            />
-          </div>
-          <div className="p-4 border-b border-border-light">
-            <label className="block text-sm text-text-primary mb-2">Access Token</label>
-            <input
-              type="password"
-              value={config.access_token}
-              onChange={(e) => updateConfig("access_token", e.target.value)}
-              placeholder="Enter Access Token"
-              className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
-            />
-          </div>
-          <div className="p-4">
-            <label className="block text-sm text-text-primary mb-2">Secret Key (Optional)</label>
-            <input
-              type="password"
-              value={config.secret_key}
-              onChange={(e) => updateConfig("secret_key", e.target.value)}
-              placeholder="Enter Secret Key"
-              className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
-            />
-          </div>
         </div>
       </div>
 
@@ -1064,6 +861,279 @@ export default function App() {
       postprocess: { ...prev.postprocess, providers: newProviders, active_provider_id: newActiveId }
     }));
   };
+
+  // 加载 Whisper 模型列表
+  const loadWhisperModels = useCallback(async () => {
+    try {
+      const models = await invoke<WhisperModel[]>("get_whisper_models");
+      setWhisperModels(models);
+    } catch (e) {
+      console.error("Failed to load whisper models:", e);
+    }
+  }, []);
+
+  // 下载 Whisper 模型
+  const handleDownloadModel = async (modelId: string) => {
+    setDownloadingModel(modelId);
+    setDownloadProgress(0);
+    try {
+      await invoke("download_whisper_model", { modelId });
+      showToast("Model downloaded", "success");
+    } catch (e) {
+      console.error("Failed to download model:", e);
+      showToast(`Download failed: ${e}`, "error");
+    }
+    setDownloadingModel(null);
+    loadWhisperModels();
+  };
+
+  // 删除 Whisper 模型
+  const handleDeleteModel = async (modelId: string) => {
+    console.log("handleDeleteModel called with:", modelId);
+    setDeletingModel(modelId);
+    try {
+      await invoke("delete_whisper_model", { modelId });
+      showToast("Model deleted", "error");
+      loadWhisperModels();
+    } catch (e) {
+      console.error("Failed to delete model:", e);
+      showToast(`Delete failed: ${e}`, "error");
+    }
+    setDeletingModel(null);
+  };
+
+  // 更新 ASR 配置
+  const updateAsrConfig = (key: string, value: unknown) => {
+    setConfig(prev => ({
+      ...prev,
+      asr: { ...prev.asr, [key]: value }
+    }));
+  };
+
+  // ASR 设置内容
+  const renderAsrSettings = () => (
+    <div className="space-y-6">
+      {/* Provider 选择器 */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+          Speech Recognition Engine
+        </h3>
+        <div className="flex gap-2">
+          {(["doubao", "whisper_local", "whisper_api"] as const).map((provider) => (
+            <button
+              key={provider}
+              onClick={() => {
+                updateAsrConfig("active_provider", provider);
+                if (provider === "whisper_local") {
+                  loadWhisperModels();
+                }
+              }}
+              className={`flex-1 px-4 py-3 rounded-xl transition-all ${
+                config.asr.active_provider === provider
+                  ? "bg-accent text-white"
+                  : "bg-bg-secondary hover:bg-bg-tertiary border border-border-light"
+              }`}
+            >
+              <div className="text-sm font-medium">
+                {provider === "doubao" && "Doubao"}
+                {provider === "whisper_local" && "Whisper Local"}
+                {provider === "whisper_api" && "Whisper API"}
+              </div>
+              <div className="text-xs opacity-70 mt-1">
+                {provider === "doubao" && "ByteDance Cloud Service"}
+                {provider === "whisper_local" && "Offline, Privacy-first"}
+                {provider === "whisper_api" && "OpenAI Cloud Service"}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 豆包配置 */}
+      {config.asr.active_provider === "doubao" && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+            豆包 Configuration
+          </h3>
+          <div className="bg-bg-secondary rounded-xl border border-border-light p-4 space-y-4">
+            <div>
+              <label className="block text-sm text-text-primary mb-2">App ID</label>
+              <input
+                type="text"
+                value={config.asr.doubao?.app_id || ""}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  asr: {
+                    ...prev.asr,
+                    doubao: { ...prev.asr.doubao!, app_id: e.target.value }
+                  }
+                }))}
+                className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
+                placeholder="Enter App ID"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-text-primary mb-2">Access Token</label>
+              <input
+                type="password"
+                value={config.asr.doubao?.access_token || ""}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  asr: {
+                    ...prev.asr,
+                    doubao: { ...prev.asr.doubao!, access_token: e.target.value }
+                  }
+                }))}
+                className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
+                placeholder="Enter Access Token"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-text-primary mb-2">Secret Key (Optional)</label>
+              <input
+                type="password"
+                value={config.asr.doubao?.secret_key || ""}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  asr: {
+                    ...prev.asr,
+                    doubao: { ...prev.asr.doubao!, secret_key: e.target.value }
+                  }
+                }))}
+                className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
+                placeholder="Enter Secret Key"
+              />
+              <p className="text-xs text-text-muted mt-2">
+                Used for request signature verification (optional)
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Whisper 本地配置 */}
+      {config.asr.active_provider === "whisper_local" && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+            Model Management
+          </h3>
+          <div className="bg-bg-secondary rounded-xl border border-border-light overflow-hidden">
+            <div className="p-4 border-b border-border-light">
+              <p className="text-xs text-text-muted">
+                Select and download a Whisper model. Larger models are more accurate but slower.
+              </p>
+            </div>
+            <div className="divide-y divide-border-light">
+              {whisperModels.map((model) => (
+                <div key={model.id} className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={model.is_selected}
+                      onChange={() => invoke("set_whisper_model", { modelId: model.id })}
+                      disabled={!model.is_downloaded}
+                      className="w-4 h-4 accent-accent"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-text-primary">{model.name}</div>
+                      <div className="text-xs text-text-muted">
+                        {(model.size_bytes / 1_000_000).toFixed(0)} MB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {model.is_downloaded ? (
+                      <>
+                        <span className="text-xs text-green-500 font-medium">Downloaded</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteModel(model.id)}
+                          disabled={deletingModel === model.id}
+                          className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Delete model"
+                        >
+                          {deletingModel === model.id ? (
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <TrashIcon />
+                          )}
+                        </button>
+                      </>
+                    ) : downloadingModel === model.id ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-bg-tertiary rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent transition-all"
+                            style={{ width: `${downloadProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-text-muted w-10">{downloadProgress.toFixed(0)}%</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleDownloadModel(model.id)}
+                        className="px-3 py-1.5 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors"
+                      >
+                        Download
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Whisper API 配置 */}
+      {config.asr.active_provider === "whisper_api" && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">
+            Whisper API Configuration
+          </h3>
+          <div className="bg-bg-secondary rounded-xl border border-border-light p-4 space-y-4">
+            <div>
+              <label className="block text-sm text-text-primary mb-2">API Key</label>
+              <input
+                type="password"
+                value={config.asr.whisper_api?.api_key || ""}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  asr: {
+                    ...prev.asr,
+                    whisper_api: { ...prev.asr.whisper_api!, api_key: e.target.value }
+                  }
+                }))}
+                className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
+                placeholder="sk-..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-text-primary mb-2">API Base URL</label>
+              <input
+                type="text"
+                value={config.asr.whisper_api?.api_base || "https://api.openai.com/v1"}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  asr: {
+                    ...prev.asr,
+                    whisper_api: { ...prev.asr.whisper_api!, api_base: e.target.value }
+                  }
+                }))}
+                className="w-full px-3 py-2.5 text-sm bg-bg-input border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
+              />
+              <p className="text-xs text-text-muted mt-2">
+                Change this if using a compatible API (e.g., Azure, Groq)
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   const renderPostProcessSettings = () => (
     <div className="space-y-6">
@@ -1599,7 +1669,7 @@ export default function App() {
               toast.type === "error"
                 ? "bg-red-500 text-white"
                 : toast.type === "success"
-                  ? "bg-accent text-white"
+                  ? "bg-green-500 text-white"
                   : "bg-bg-secondary text-text-primary border border-border"
             }`}
           >
@@ -1624,20 +1694,20 @@ export default function App() {
           <button
             onClick={handleClose}
             className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-90 transition-all group flex items-center justify-center"
-            title="关闭"
+            title="Close"
           >
             <span className="opacity-0 group-hover:opacity-100 text-[#4a0002] text-[8px] font-bold">×</span>
           </button>
           <button
             onClick={handleMinimize}
             className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-90 transition-all group flex items-center justify-center"
-            title="最小化"
+            title="Minimize"
           >
             <span className="opacity-0 group-hover:opacity-100 text-[#985600] text-[10px] font-bold leading-none">−</span>
           </button>
           <button
             className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-90 transition-all opacity-50 cursor-default"
-            title="最大化 (禁用)"
+            title="Maximize (disabled)"
             disabled
           />
         </div>
@@ -1652,7 +1722,7 @@ export default function App() {
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg text-icon hover:text-icon-hover hover:bg-bg-tertiary transition-colors"
-            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
           >
             {isDark ? <SunIcon /> : <MoonIcon />}
           </button>
@@ -1663,7 +1733,7 @@ export default function App() {
                 ? "text-accent bg-accent/10"
                 : "text-icon hover:text-icon-hover hover:bg-bg-tertiary"
             }`}
-            title="设置"
+            title="Settings"
           >
             <SettingsIcon />
           </button>
@@ -1713,7 +1783,7 @@ export default function App() {
               <h2 className="text-lg font-semibold text-text-primary">
                 {currentTab?.label}
               </h2>
-              {(settingsTab === "general" || settingsTab === "postprocess") && (
+              {(settingsTab === "general" || settingsTab === "postprocess" || settingsTab === "asr") && (
                 <button
                   onClick={saveConfig}
                   className="px-4 py-1.5 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent-hover active:scale-[0.98] transition-all"
@@ -1726,6 +1796,7 @@ export default function App() {
             {/* 设置内容 */}
             <div className="flex-1 p-6 overflow-y-auto">
               {settingsTab === "general" && renderGeneralSettings()}
+              {settingsTab === "asr" && renderAsrSettings()}
               {settingsTab === "postprocess" && renderPostProcessSettings()}
               {settingsTab === "history" && renderHistorySettings()}
               {settingsTab === "logs" && renderLogsSettings()}

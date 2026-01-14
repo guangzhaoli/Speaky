@@ -60,6 +60,15 @@ base64 = "0.22"
 # Gzip 解压 (使用 rust 后端，更小)
 flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 
+# Whisper.cpp 绑定 (本地语音识别)
+whisper-rs = "0.15"
+
+# 异步 trait 支持
+async-trait = "0.1"
+
+# futures 扩展
+futures = "0.3"
+
 # 零拷贝类型转换
 bytemuck = { version = "1.14", features = ["derive"] }
 
@@ -67,7 +76,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 auto-launch = "0.5"
 
 # HTTP 客户端 (LLM API)
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart"], default-features = false }
 
 # 时间处理 (精简 features)
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock", "std"] }
