@@ -19,7 +19,7 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-clipboard-manager = "2"
 
 # 音频采集
-cpal = "0.15"
+cpal = "0.17"
 
 # 键盘模拟
 enigo = "0.3"
