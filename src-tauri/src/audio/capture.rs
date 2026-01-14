@@ -17,7 +17,7 @@ pub fn list_audio_devices() -> Vec<AudioDevice> {
     let host = cpal::default_host();
     let default_device_name = host
         .default_input_device()
-        .and_then(|d| d.name().ok());
+        .and_then(|d| d.description().ok().map(|desc| desc.name().to_string()));
 
     let mut devices = Vec::with_capacity(8); // 预分配避免多次分配
 
@@ -29,12 +29,10 @@ pub fn list_audio_devices() -> Vec<AudioDevice> {
 
     if let Ok(input_devices) = host.input_devices() {
         for device in input_devices {
-            if let Ok(name) = device.name() {
+            if let Ok(desc) = device.description() {
+                let name = desc.name().to_string();
                 let is_default = default_device_name.as_ref() == Some(&name);
-                devices.push(AudioDevice {
-                    name,
-                    is_default,
-                });
+                devices.push(AudioDevice { name, is_default });
             }
         }
     }
@@ -119,16 +117,17 @@ fn run_audio_capture(
     } else {
         host.input_devices()
             .map_err(|e| format!("Failed to enumerate devices: {}", e))?
-            .find(|d| d.name().map(|n| n == device_name).unwrap_or(false))
+            .find(|d| d.description().ok().map(|desc| desc.name() == device_name).unwrap_or(false))
             .ok_or_else(|| format!("Device '{}' not found", device_name))?
     };
 
-    log::info!("Using input device: {}", device.name().unwrap_or_default());
+    let device_name_str = device.description().map(|d| d.name().to_string()).unwrap_or_default();
+    log::info!("Using input device: {}", device_name_str);
 
     // 豆包 ASR 要求: 16kHz, 单声道, 16-bit PCM
     let config = cpal::StreamConfig {
         channels: 1,
-        sample_rate: cpal::SampleRate(16000),
+        sample_rate: 16000,
         buffer_size: cpal::BufferSize::Default,
     };
 
