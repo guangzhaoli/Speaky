@@ -73,7 +73,7 @@ futures = "0.3"
 bytemuck = { version = "1.14", features = ["derive"] }
 
 # 开机启动
-auto-launch = "0.5"
+auto-launch = "0.6"
 
 # HTTP 客户端 (LLM API)
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "multipart"], default-features = false }
