@@ -47,12 +47,22 @@ pub fn run() {
                         match event.state() {
                             ShortcutState::Pressed => {
                                 // 使用 compare_exchange 确保只有一个线程能启动录音
-                                if processing.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+                                if processing
+                                    .compare_exchange(
+                                        false,
+                                        true,
+                                        Ordering::SeqCst,
+                                        Ordering::SeqCst,
+                                    )
+                                    .is_err()
+                                {
                                     return; // 已经在处理中
                                 }
                                 log::info!("Shortcut pressed - starting recording");
                                 tauri::async_runtime::spawn(async move {
-                                    if let Err(e) = commands::handle_start_recording(&app_clone).await {
+                                    if let Err(e) =
+                                        commands::handle_start_recording(&app_clone).await
+                                    {
                                         log::error!("Failed to start recording: {}", e);
                                         // 如果启动失败，重置状态
                                         SHORTCUT_PROCESSING.store(false, Ordering::SeqCst);
@@ -66,7 +76,9 @@ pub fn run() {
                                 }
                                 log::info!("Shortcut released - stopping recording");
                                 tauri::async_runtime::spawn(async move {
-                                    if let Err(e) = commands::handle_stop_recording(&app_clone).await {
+                                    if let Err(e) =
+                                        commands::handle_stop_recording(&app_clone).await
+                                    {
                                         log::error!("Failed to stop recording: {}", e);
                                     }
                                     SHORTCUT_PROCESSING.store(false, Ordering::SeqCst);

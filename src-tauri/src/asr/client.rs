@@ -64,7 +64,12 @@ impl AsrClient {
         URL_SAFE_NO_PAD.encode(result.into_bytes())
     }
 
-    fn build_auth_header(&self, method: &str, path: &str, headers_to_sign: &[(&str, &str)]) -> String {
+    fn build_auth_header(
+        &self,
+        method: &str,
+        path: &str,
+        headers_to_sign: &[(&str, &str)],
+    ) -> String {
         if !self.secret_key.is_empty() {
             let mut string_to_sign = format!("{} {} HTTP/1.1\n", method, path);
             let header_names: Vec<&str> = headers_to_sign.iter().map(|(k, _)| *k).collect();
@@ -83,10 +88,15 @@ impl AsrClient {
     }
 
     fn build_seed_message(msg_type: u8, payload: &[u8], compress: bool) -> Vec<u8> {
-        let compression = if compress { MESSAGE_COMPRESS_GZIP } else { MESSAGE_COMPRESS_NONE };
+        let compression = if compress {
+            MESSAGE_COMPRESS_GZIP
+        } else {
+            MESSAGE_COMPRESS_NONE
+        };
 
         let compressed_payload = if compress {
-            let mut encoder = GzEncoder::new(Vec::with_capacity(payload.len()), Compression::default());
+            let mut encoder =
+                GzEncoder::new(Vec::with_capacity(payload.len()), Compression::default());
             encoder.write_all(payload).unwrap();
             encoder.finish().unwrap()
         } else {
@@ -133,7 +143,10 @@ impl AsrClient {
             (MESSAGE_TYPE_AUDIO_ONLY << 4) | 0x02,
             0x00,
             0x00,
-            0x00, 0x00, 0x00, 0x00, // payload length = 0
+            0x00,
+            0x00,
+            0x00,
+            0x00, // payload length = 0
         ]
     }
 
@@ -156,7 +169,11 @@ impl AsrClient {
 
         // 消息类型 0x09 是服务器响应（包含识别结果）
         if message_type == 0x09 {
-            let skip_bytes = if message_type_specific_flags == 1 { 8 } else { 4 };
+            let skip_bytes = if message_type_specific_flags == 1 {
+                8
+            } else {
+                4
+            };
             if payload.len() < skip_bytes {
                 return None;
             }
@@ -206,10 +223,7 @@ impl AsrClient {
         let host = uri.host().unwrap_or("openspeech.bytedance.com");
         let path = uri.path();
 
-        let headers_to_sign = vec![
-            ("Host", host),
-            ("X-Api-Resource-Id", RESOURCE_ID),
-        ];
+        let headers_to_sign = vec![("Host", host), ("X-Api-Resource-Id", RESOURCE_ID)];
 
         let auth_header = self.build_auth_header("GET", path, &headers_to_sign);
 

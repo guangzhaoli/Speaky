@@ -23,9 +23,8 @@ const MAX_HISTORY_ENTRIES: usize = 100;
 impl History {
     /// 获取历史文件路径
     fn history_path() -> Option<PathBuf> {
-        ProjectDirs::from("com", "speaky", "Speaky").map(|dirs| {
-            dirs.data_dir().join("history.json")
-        })
+        ProjectDirs::from("com", "speaky", "Speaky")
+            .map(|dirs| dirs.data_dir().join("history.json"))
     }
 
     /// 从文件加载历史记录
@@ -56,8 +55,7 @@ impl History {
         let content = serde_json::to_string(self)
             .map_err(|e| format!("Failed to serialize history: {}", e))?;
 
-        fs::write(&path, content)
-            .map_err(|e| format!("Failed to write history: {}", e))?;
+        fs::write(&path, content).map_err(|e| format!("Failed to write history: {}", e))?;
 
         log::debug!("History saved ({} entries)", self.entries.len());
         Ok(())

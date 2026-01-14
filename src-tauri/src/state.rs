@@ -72,9 +72,8 @@ impl Default for AppConfig {
 impl AppConfig {
     /// 获取配置文件路径
     fn config_path() -> Option<PathBuf> {
-        ProjectDirs::from("com", "speaky", "Speaky").map(|dirs| {
-            dirs.config_dir().join("config.toml")
-        })
+        ProjectDirs::from("com", "speaky", "Speaky")
+            .map(|dirs| dirs.config_dir().join("config.toml"))
     }
 
     /// 从文件加载配置
@@ -82,17 +81,15 @@ impl AppConfig {
         if let Some(path) = Self::config_path() {
             if path.exists() {
                 match fs::read_to_string(&path) {
-                    Ok(content) => {
-                        match toml::from_str(&content) {
-                            Ok(config) => {
-                                log::info!("Config loaded from {:?}", path);
-                                return config;
-                            }
-                            Err(e) => {
-                                log::error!("Failed to parse config: {}", e);
-                            }
+                    Ok(content) => match toml::from_str(&content) {
+                        Ok(config) => {
+                            log::info!("Config loaded from {:?}", path);
+                            return config;
                         }
-                    }
+                        Err(e) => {
+                            log::error!("Failed to parse config: {}", e);
+                        }
+                    },
                     Err(e) => {
                         log::error!("Failed to read config file: {}", e);
                     }
@@ -108,14 +105,14 @@ impl AppConfig {
 
         // 创建配置目录
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("Failed to create config dir: {}", e))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
         }
 
         let content = toml::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
-        fs::write(&path, content)
-            .map_err(|e| format!("Failed to write config: {}", e))?;
+        fs::write(&path, content).map_err(|e| format!("Failed to write config: {}", e))?;
 
         log::info!("Config saved to {:?}", path);
         Ok(())

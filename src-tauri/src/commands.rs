@@ -1,5 +1,5 @@
 use crate::asr::client::{AsrClient, AsrResult};
-use crate::audio::capture::{AudioCaptureController, AudioDevice, list_audio_devices};
+use crate::audio::capture::{list_audio_devices, AudioCaptureController, AudioDevice};
 use crate::history::{History, HistoryEntry};
 use crate::input::keyboard::KeyboardSimulator;
 use crate::postprocess::{self, LlmProvider};
@@ -179,7 +179,12 @@ pub fn clear_history() -> Result<(), String> {
 pub fn get_config_file_path() -> Result<String, String> {
     use directories::ProjectDirs;
     ProjectDirs::from("com", "speaky", "Speaky")
-        .map(|dirs| dirs.config_dir().join("config.toml").to_string_lossy().to_string())
+        .map(|dirs| {
+            dirs.config_dir()
+                .join("config.toml")
+                .to_string_lossy()
+                .to_string()
+        })
         .ok_or_else(|| "Failed to get config path".to_string())
 }
 
@@ -214,8 +219,8 @@ pub fn save_config_file_content(content: String, app: AppHandle) -> Result<(), S
     }
 
     // 先验证 TOML 格式
-    let config: AppConfig = toml::from_str(&content)
-        .map_err(|e| format!("Invalid TOML format: {}", e))?;
+    let config: AppConfig =
+        toml::from_str(&content).map_err(|e| format!("Invalid TOML format: {}", e))?;
 
     // 写入文件
     fs::write(&path, &content).map_err(|e| format!("Failed to write config file: {}", e))?;
@@ -269,7 +274,10 @@ pub fn set_logging_enabled(enabled: bool, app: AppHandle) -> Result<(), String> 
     config.enable_logging = enabled;
     state.update_config(config)?;
 
-    log::info!("Logging {} by user", if enabled { "enabled" } else { "disabled" });
+    log::info!(
+        "Logging {} by user",
+        if enabled { "enabled" } else { "disabled" }
+    );
     Ok(())
 }
 
@@ -381,7 +389,10 @@ fn update_shortcut(app: &AppHandle, old_shortcut: &str, new_shortcut: &str) -> R
 
     // 先尝试注册新快捷键（检查是否被占用）
     if let Err(e) = global_shortcut.register(new.clone()) {
-        return Err(format!("Shortcut '{}' is already in use or invalid: {}", new_shortcut, e));
+        return Err(format!(
+            "Shortcut '{}' is already in use or invalid: {}",
+            new_shortcut, e
+        ));
     }
 
     // 注册成功后，注销旧快捷键
@@ -398,8 +409,7 @@ fn update_auto_launch(enable: bool, silent: bool) -> Result<(), String> {
     let app_name = "Speaky";
 
     // 获取当前可执行文件路径
-    let exe_path = std::env::current_exe()
-        .map_err(|e| format!("Failed to get exe path: {}", e))?;
+    let exe_path = std::env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
 
     let exe_path_str = exe_path.to_string_lossy().to_string();
 
@@ -664,10 +674,7 @@ pub async fn handle_stop_recording(app: &AppHandle) -> Result<String, String> {
     // 等待 ASR 完成（最多 2 秒）
     let complete_rx = ASR_COMPLETE_RX.lock().take();
     if let Some(rx) = complete_rx {
-        let _ = tokio::time::timeout(
-            tokio::time::Duration::from_millis(2000),
-            rx,
-        ).await;
+        let _ = tokio::time::timeout(tokio::time::Duration::from_millis(2000), rx).await;
     }
 
     let transcript = state.get_transcript();
@@ -687,43 +694,41 @@ pub async fn handle_stop_recording(app: &AppHandle) -> Result<String, String> {
         if !config.realtime_input {
             // 键盘输入（在独立线程中执行以避免影响 X11 状态）
             if config.auto_type && config.auto_copy {
-                let result = tokio::task::spawn_blocking(move || {
-                    match get_keyboard() {
-                        Ok(mut guard) => {
-                            if let Some(keyboard) = guard.as_mut() {
-                                if let Err(e) = keyboard.paste() {
-                                    log::error!("Failed to paste text: {}", e);
-                                } else {
-                                    log::info!("Text pasted successfully");
-                                }
+                let result = tokio::task::spawn_blocking(move || match get_keyboard() {
+                    Ok(mut guard) => {
+                        if let Some(keyboard) = guard.as_mut() {
+                            if let Err(e) = keyboard.paste() {
+                                log::error!("Failed to paste text: {}", e);
+                            } else {
+                                log::info!("Text pasted successfully");
                             }
                         }
-                        Err(e) => {
-                            log::error!("Failed to get keyboard simulator: {}", e);
-                        }
                     }
-                }).await;
+                    Err(e) => {
+                        log::error!("Failed to get keyboard simulator: {}", e);
+                    }
+                })
+                .await;
                 if let Err(e) = result {
                     log::error!("Keyboard task failed: {}", e);
                 }
             } else if config.auto_type {
                 let transcript_clone = transcript.clone();
-                let result = tokio::task::spawn_blocking(move || {
-                    match get_keyboard() {
-                        Ok(mut guard) => {
-                            if let Some(keyboard) = guard.as_mut() {
-                                if let Err(e) = keyboard.type_text(&transcript_clone) {
-                                    log::error!("Failed to type text: {}", e);
-                                } else {
-                                    log::info!("Text typed successfully");
-                                }
+                let result = tokio::task::spawn_blocking(move || match get_keyboard() {
+                    Ok(mut guard) => {
+                        if let Some(keyboard) = guard.as_mut() {
+                            if let Err(e) = keyboard.type_text(&transcript_clone) {
+                                log::error!("Failed to type text: {}", e);
+                            } else {
+                                log::info!("Text typed successfully");
                             }
                         }
-                        Err(e) => {
-                            log::error!("Failed to get keyboard simulator: {}", e);
-                        }
                     }
-                }).await;
+                    Err(e) => {
+                        log::error!("Failed to get keyboard simulator: {}", e);
+                    }
+                })
+                .await;
                 if let Err(e) = result {
                     log::error!("Keyboard task failed: {}", e);
                 }

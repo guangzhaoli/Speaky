@@ -10,9 +10,7 @@ static LOGGING_ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// 获取日志文件路径
 pub fn log_file_path() -> Option<PathBuf> {
-    ProjectDirs::from("com", "speaky", "Speaky").map(|dirs| {
-        dirs.data_dir().join("speaky.log")
-    })
+    ProjectDirs::from("com", "speaky", "Speaky").map(|dirs| dirs.data_dir().join("speaky.log"))
 }
 
 /// 设置日志启用状态
@@ -38,11 +36,7 @@ pub fn write_log(level: &str, message: &str) {
         }
 
         // 追加写入日志
-        if let Ok(mut file) = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-        {
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
             let _ = writeln!(file, "[{}] [{}] {}", timestamp, level, message);
         }
@@ -61,10 +55,7 @@ pub fn read_logs(max_lines: usize) -> Result<Vec<String>, String> {
     let reader = BufReader::new(file);
 
     // 读取所有行
-    let lines: Vec<String> = reader
-        .lines()
-        .filter_map(|l| l.ok())
-        .collect();
+    let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
 
     // 返回最后 max_lines 行
     let start = if lines.len() > max_lines {
@@ -109,7 +100,12 @@ impl log::Log for FileLogger {
             let message = format!("{}", record.args());
 
             // 输出到 stderr
-            eprintln!("[{}] [{}] {}", Local::now().format("%Y-%m-%d %H:%M:%S"), level, message);
+            eprintln!(
+                "[{}] [{}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                level,
+                message
+            );
 
             // 写入文件
             write_log(level, &message);

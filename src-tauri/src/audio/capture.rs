@@ -15,9 +15,7 @@ pub struct AudioDevice {
 /// 获取所有可用的输入设备列表
 pub fn list_audio_devices() -> Vec<AudioDevice> {
     let host = cpal::default_host();
-    let default_device_name = host
-        .default_input_device()
-        .and_then(|d| d.name().ok());
+    let default_device_name = host.default_input_device().and_then(|d| d.name().ok());
 
     let mut devices = Vec::with_capacity(8); // 预分配避免多次分配
 
@@ -31,10 +29,7 @@ pub fn list_audio_devices() -> Vec<AudioDevice> {
         for device in input_devices {
             if let Ok(name) = device.name() {
                 let is_default = default_device_name.as_ref() == Some(&name);
-                devices.push(AudioDevice {
-                    name,
-                    is_default,
-                });
+                devices.push(AudioDevice { name, is_default });
             }
         }
     }

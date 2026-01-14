@@ -19,9 +19,9 @@ pub struct LlmProvider {
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 pub enum PostProcessMode {
     #[default]
-    General,  // 日常输入
-    Code,     // 代码注释
-    Meeting,  // 会议记录
+    General, // 日常输入
+    Code,    // 代码注释
+    Meeting, // 会议记录
 }
 
 /// 后处理总配置

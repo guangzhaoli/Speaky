@@ -10,9 +10,12 @@ pub struct KeyboardSimulator {
 
 impl KeyboardSimulator {
     pub fn new() -> Result<Self, String> {
-        let enigo =
-            Enigo::new(&Settings::default()).map_err(|e| format!("Failed to create Enigo: {}", e))?;
-        Ok(Self { enigo, last_input_len: 0 })
+        let enigo = Enigo::new(&Settings::default())
+            .map_err(|e| format!("Failed to create Enigo: {}", e))?;
+        Ok(Self {
+            enigo,
+            last_input_len: 0,
+        })
     }
 
     /// 重置输入状态（开始新的录音会话时调用）
