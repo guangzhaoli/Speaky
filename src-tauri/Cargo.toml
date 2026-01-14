@@ -24,12 +24,12 @@ cpal = "0.15"
 # 键盘模拟
 enigo = "0.3"
 
-# WebSocket
-tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
-futures-util = "0.3"
+# WebSocket (使用 rustls 替代 native-tls，减少二进制大小)
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots", "connect"], default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
-# 异步运行时
-tokio = { version = "1", features = ["full"] }
+# 异步运行时 (精简 features)
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util"] }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -40,7 +40,6 @@ parking_lot = "0.12"
 
 # 日志
 log = "0.4"
-env_logger = "0.11"
 
 # 配置持久化
 directories = "5"
@@ -50,19 +49,49 @@ toml = "0.8"
 thiserror = "1"
 anyhow = "1"
 
-# UUID 生成
-uuid = { version = "1", features = ["v4"] }
-
-# 静态变量
-lazy_static = "1.4"
+# UUID 生成 (使用更小的随机数生成器)
+uuid = { version = "1", features = ["v4", "fast-rng"] }
 
 # HMAC 签名认证
 hmac = "0.12"
 sha2 = "0.10"
 base64 = "0.22"
 
-# Gzip 解压
-flate2 = "1.0"
+# Gzip 解压 (使用 rust 后端，更小)
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
 
 # 零拷贝类型转换
 bytemuck = { version = "1.14", features = ["derive"] }
+
+# 开机启动
+auto-launch = "0.5"
+
+# HTTP 客户端 (LLM API)
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+
+# 时间处理 (精简 features)
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock", "std"] }
+
+# Release 优化配置
+[profile.release]
+# 启用 LTO 进行链接时优化
+lto = true
+# 单 codegen unit 获得更好的优化
+codegen-units = 1
+# 移除 debug 符号
+strip = "symbols"
+# 优化级别
+opt-level = "z"
+# 启用 panic = abort 减少 unwinding 代码
+panic = "abort"
+
+# Dev 配置优化编译速度
+[profile.dev]
+# 增量编译
+incremental = true
+# 减少优化加快编译
+opt-level = 0
+
+[profile.dev.package."*"]
+# 依赖使用优化编译，加快运行
+opt-level = 2

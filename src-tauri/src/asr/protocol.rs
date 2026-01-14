@@ -57,21 +57,20 @@ impl Default for AsrConfig {
 
 /// 豆包 ASR 响应
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct AsrResponse {
     #[serde(default)]
-    pub reqid: Option<String>,
+    reqid: Option<String>,
     #[serde(default)]
     pub code: i32,
     #[serde(default)]
-    pub message: String,
+    message: String,
     #[serde(default)]
-    pub sequence: Option<i32>,
-    // 旧格式：result 是数组
-    // 新格式：result 是对象
+    sequence: Option<i32>,
     #[serde(default)]
     pub result: Option<AsrResultWrapper>,
     #[serde(default)]
-    pub audio_info: Option<AudioInfo>,
+    audio_info: Option<AudioInfo>,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -84,35 +83,39 @@ pub enum AsrResultWrapper {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct AsrResultSingle {
     #[serde(default)]
     pub text: String,
     #[serde(default)]
     pub prefetch: bool,
     #[serde(default)]
-    pub additions: Option<serde_json::Value>,
+    additions: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct AudioInfo {
     #[serde(default)]
-    pub duration: u64,
+    duration: u64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct AsrResult {
     pub text: String,
     #[serde(default)]
-    pub utterances: Vec<Utterance>,
+    utterances: Vec<Utterance>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct Utterance {
-    pub text: String,
-    pub start_time: u64,
-    pub end_time: u64,
+    text: String,
+    start_time: u64,
+    end_time: u64,
     #[serde(default)]
-    pub definite: bool,
+    definite: bool,
 }
 
 impl AsrResponse {

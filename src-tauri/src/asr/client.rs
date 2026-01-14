@@ -6,6 +6,7 @@ use flate2::Compression;
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::borrow::Cow;
 use std::io::{Read, Write};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
@@ -82,15 +83,10 @@ impl AsrClient {
     }
 
     fn build_seed_message(msg_type: u8, payload: &[u8], compress: bool) -> Vec<u8> {
-        let mut header = vec![0u8; 4];
-        header[0] = (PROTOCOL_VERSION << 4) | HEADER_SIZE;
-        header[1] = (msg_type << 4) | 0x00;
         let compression = if compress { MESSAGE_COMPRESS_GZIP } else { MESSAGE_COMPRESS_NONE };
-        header[2] = (MESSAGE_SERIAL_JSON << 4) | compression;
-        header[3] = 0x00;
 
         let compressed_payload = if compress {
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            let mut encoder = GzEncoder::new(Vec::with_capacity(payload.len()), Compression::default());
             encoder.write_all(payload).unwrap();
             encoder.finish().unwrap()
         } else {
@@ -98,7 +94,15 @@ impl AsrClient {
         };
 
         let payload_len = compressed_payload.len() as u32;
-        let mut message = header;
+        // 预分配精确大小: 4字节头 + 4字节长度 + payload
+        let mut message = Vec::with_capacity(8 + compressed_payload.len());
+
+        // Header
+        message.push((PROTOCOL_VERSION << 4) | HEADER_SIZE);
+        message.push((msg_type << 4) | 0x00);
+        message.push((MESSAGE_SERIAL_JSON << 4) | compression);
+        message.push(0x00);
+
         message.extend_from_slice(&payload_len.to_be_bytes());
         message.extend_from_slice(&compressed_payload);
         message
@@ -160,14 +164,14 @@ impl AsrClient {
             let msg_data = &payload[skip_bytes..];
             let text_data = Self::decompress_if_needed(msg_data, message_compression);
 
-            if let Ok(text) = String::from_utf8(text_data) {
+            if let Ok(text) = String::from_utf8(text_data.into_owned()) {
                 return serde_json::from_str(&text).ok();
             }
         }
         // 消息类型 0x0c 也可能是识别结果
         else if message_type == 0x0c {
             let text_data = Self::decompress_if_needed(payload, message_compression);
-            if let Ok(text) = String::from_utf8(text_data) {
+            if let Ok(text) = String::from_utf8(text_data.into_owned()) {
                 return serde_json::from_str(&text).ok();
             }
         }
@@ -175,16 +179,17 @@ impl AsrClient {
         None
     }
 
-    fn decompress_if_needed(data: &[u8], compression: u8) -> Vec<u8> {
+    fn decompress_if_needed(data: &[u8], compression: u8) -> Cow<'_, [u8]> {
         if compression == 1 {
             let mut decoder = GzDecoder::new(data);
             let mut decompressed = Vec::new();
             match decoder.read_to_end(&mut decompressed) {
-                Ok(_) => decompressed,
-                Err(_) => data.to_vec(),
+                Ok(_) => Cow::Owned(decompressed),
+                Err(_) => Cow::Borrowed(data),
             }
         } else {
-            data.to_vec()
+            // 未压缩时直接借用，避免复制
+            Cow::Borrowed(data)
         }
     }
 
