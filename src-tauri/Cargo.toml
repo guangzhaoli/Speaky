@@ -22,7 +22,7 @@ tauri-plugin-clipboard-manager = "2"
 cpal = "0.15"
 
 # 键盘模拟
-enigo = "0.3"
+enigo = "0.6"
 
 # WebSocket (使用 rustls 替代 native-tls，减少二进制大小)
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots", "connect"], default-features = false }
