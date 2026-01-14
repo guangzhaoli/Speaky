@@ -25,7 +25,7 @@ cpal = "0.17"
 enigo = "0.6"
 
 # WebSocket (使用 rustls 替代 native-tls，减少二进制大小)
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots", "connect"], default-features = false }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots", "connect"], default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 
 # 异步运行时 (精简 features)
